@@ -634,7 +634,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             outputfile = open(filename, 'wb')
 
             readsofar = 0
-            chunksize = 8192
+            chunksize = 1024
             try:
                 self.downloading = name
                 while(True):
