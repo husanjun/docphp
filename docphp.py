@@ -620,7 +620,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
 
             filename = getDocphpPath() + 'language/php_manual_' + name + '.tar.gz.downloading'
 
-            response = urllib.request.urlopen(url)
+            response = urllib.request.urlopen(url, timeout=60)
             try:
                 if response.headers['Content-Length']:
                     totalsize = int(response.headers['Content-Length'])  # assume correct header
@@ -640,7 +640,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
                 while(True):
                     # download chunk
                     data = response.read(chunksize)
-                    if not data:  # finished downloading
+                    if not data and readsofar == totalsize:  # finished downloading
                         break
                     readsofar += len(data)
                     outputfile.write(data)  # save to filename
