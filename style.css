@@ -1,20 +1,24 @@
-#outer{background-color:#f2f2f2;}
-#container{margin:10px;color:#000;}
+#outer{background-color:#3e3d32;}
+#container{margin:10px;color:#fff;}
 .phpcode,.note,.tip,.classsynopsis,.methodsynopsis,.warning,.informaltable,.caution{padding:10px}
-.phpcode,.note,.classsynopsis,.methodsynopsis,.doctable.informaltable{background-color:#fff}
+.phpcode,.note,.classsynopsis,.methodsynopsis,.doctable.informaltable{background-color:#272822}
+.phpcode.span{color: #cfcfc2}
 .tip{background-color:#D9E6F2}
 .warning{background-color:#F4DFDF}
-.caution{background-color:#FCFCE9}
-.methodsynopsis{color:#737373;}
-span.type,.parameter{color: #693}
-.methodname{color:#369;}
-code.parameter{color:#369;}
-h1,h2,h3,h4,h5,h6{color: #793862;}
-.horizontal-rule{background-color: #793862;padding: 0.5px;margin-bottom: 10px}
+/*.caution{background-color:#272822}*/
+.caution{color:#f92672;background-color:#272822}
+/*.methodsynopsis{color:#fff;}*/
+.initializer{color:#f92672;}
+span.type{color: #66d9ef}
+span.parameter{color: #fd971f}
+.methodname{color:#a6e22e;}
+code.parameter{color:#fd971f;}
+h1,h2,h3,h4,h5,h6{color: #66d9ef;}
+.horizontal-rule{background-color: #66d9ef;padding: 0.5px;margin-bottom: 10px}
 .border{padding:1;margin:10px 0;}
 .border-blue{background-color:#9FBFDF}
 .border-gray{background-color:#d9d9d9}
 .border-pink{background-color:#eabfbf}
 .border-yellow{background-color:#E2E2D1}
 .dd{margin-left: 1.5em}
-a.constant{color:#420;}
+a.constant{color:#ae81ff;}
