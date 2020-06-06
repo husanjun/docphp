@@ -6,7 +6,7 @@ import shutil
 import tarfile
 import webbrowser
 import time
-import urllib
+import requests
 from Default import symbol as sublime_symbol
 from html.parser import HTMLParser
 
@@ -416,6 +416,8 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         content = '<style>'+sublime.load_resource('Packages/' + package_name + '/style.css') + \
             '</style><div id="outer"><div id="container">' + content + "</div></div>"
         content = re.sub('<strong><code>([A-Z_]+)</code></strong>', '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
+        content = content.replace('#FF8000', '#75715e').replace('#0000BB',
+            '#fff').replace('#007700', '#f92672').replace('#DD0000', '#e6db74')
         return content
 
     def formatPanel(self, content):
@@ -614,13 +616,14 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         sublime.message_dialog('Language ' + languageName + ' is checked out')
 
     def downloadLanguageGZ(self, name):
+        requests.packages.urllib3.disable_warnings()
         err = None
         try:
             url = 'https://php.net/distributions/manual/php_manual_' + name + '.tar.gz'
 
             filename = getDocphpPath() + 'language/php_manual_' + name + '.tar.gz.downloading'
 
-            response = urllib.request.urlopen(url, timeout=60)
+            response = requests.get(url, stream=True, verify=False)
             try:
                 if response.headers['Content-Length']:
                     totalsize = int(response.headers['Content-Length'])  # assume correct header
@@ -631,19 +634,30 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             except KeyError:
                 totalsize = None
 
-            outputfile = open(filename, 'wb')
-
             readsofar = 0
+            isContinue = False
+            if os.path.exists(filename):
+                readsofar = os.path.getsize(filename)  # 本地已经下载的文件大小
+
+            # if readsofar:
+            if readsofar:
+                isContinue = sublime.ok_cancel_dialog('Whether to continue with an uncompleted package, choosing cancel will be downloaded from the beginning','continue')
+
+            if not isContinue:
+                readsofar = 0
+
+            headers = {'Range': 'bytes=%d-' % readsofar}
+            resp = requests.get(url, stream=True, verify=False, headers=headers)
+            outputfile = open(filename, 'wb' if not isContinue else 'ab')
             chunksize = 1024
             try:
                 self.downloading = name
-                while(True):
-                    # download chunk
-                    data = response.read(chunksize)
-                    if not data and readsofar == totalsize:  # finished downloading
+                for data in resp.iter_content(chunk_size=chunksize):
+                    if not data:  # finished downloading
                         break
                     readsofar += len(data)
                     outputfile.write(data)  # save to filename
+                    outputfile.flush()
                     if totalsize:
                         # report progress
                         percent = readsofar * 1e2 / totalsize  # assume totalsize > 0
@@ -655,13 +669,13 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
                 outputfile.close()
                 self.downloading = False
                 if totalsize and readsofar != totalsize:
-                    os.unlink(filename)
+                    # os.unlink(filename)
                     err = 'Download failed'
 
-        except (urllib.error.HTTPError) as e:
+        except (requests.exceptions.HTTPError) as e:
             err = '%s: HTTP error %s contacting API' % (__name__, str(e.code))
-        except (urllib.error.URLError) as e:
-            err = '%s: URL error %s contacting API' % (__name__, str(e.reason))
+        except (requests.exceptions.ConnectionError) as e:
+            err = '%s: ConnectionError error %s contacting API' % (__name__, str(e.reason))
         except Exception as e:
             err = e.__class__.__name__
 
@@ -674,7 +688,6 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             os.rename(filename, newname)
             return True
 
-        print(err)
         sublime.message_dialog('Language ' + name + ' checkout failed. Please try again.')
 
         return False
