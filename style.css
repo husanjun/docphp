@@ -4,9 +4,9 @@
 .phpcode,.note,.classsynopsis,.methodsynopsis,.doctable.informaltable{background-color:#272822}
 .phpcode.span{color: #cfcfc2}
 .tip{background-color:#D9E6F2}
-.warning{background-color:#F4DFDF}
+/*.warning{background-color:#F4DFDF}*/
 /*.caution{background-color:#272822}*/
-.caution{color:#f92672;background-color:#272822}
+.caution,.warning{color:#f92672;background-color:#272822}
 /*.methodsynopsis{color:#fff;}*/
 .initializer{color:#f92672;}
 span.type{color: #66d9ef}

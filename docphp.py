@@ -1,7 +1,7 @@
 import sublime
 import sublime_plugin
 import re
-import os
+import os,threading
 import shutil
 import tarfile
 import webbrowser
@@ -275,13 +275,7 @@ def getSymbolFromHtml(symbol):
 
     return output
 
-
 class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
-    history = []
-    currentSymbol = ''
-    projectSymbols = []
-    window = False
-    projectView = False
 
     def is_enabled(self, **args):
         selection = self.view.sel()
@@ -296,8 +290,32 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         return True
 
     def run(self, edit, event=None, symbol=None, force=False):
+        thread = show_definition(self.view, edit, event, symbol, force)
+        thread.start()
+        ThreadProgress(thread, 'Searching', 'Searching Done')
+
+class show_definition(threading.Thread):
+    def __init__(self, view, edit, event, symbol, force):
+        self.view = view
+        self.edit = edit
+        self.event = event
+        self.symbol = symbol
+        self.force = force
+        threading.Thread.__init__(self)
+
+    history = []
+    currentSymbol = ''
+    projectSymbols = []
+    window = False
+    projectView = False
+
+    def run(self):
         global language, currentView
         view = self.view
+        edit = self.edit
+        event = self.event
+        symbol = self.symbol
+        force = self.force
         currentView = view
         pt = False
 
@@ -323,7 +341,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
 
         if not symbolDescription:
             if getSetting('prompt_when_not_found'):
-                view.show_popup('not found', sublime.COOPERATE_WITH_AUTO_COMPLETE)
+                view.show_popup('Not found', sublime.COOPERATE_WITH_AUTO_COMPLETE)
                 return
             return
 
@@ -391,6 +409,11 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
             self.history.append(self.currentSymbol)
             symbol = url[:url.find('.html')]
             self.currentSymbol = symbol
+        if not symbol:
+            if getSetting('prompt_when_not_found'):
+                self.view.show_popup('Not found', sublime.COOPERATE_WITH_AUTO_COMPLETE)
+                return
+            return
         symbol, content = getSymbolDescription(symbol)
 
         if content == False:
@@ -712,6 +735,7 @@ class DocphpSelectLanguageCommand(sublime_plugin.TextCommand):
             language = re.search('^\w+', self.languageList[index]).group(0)
             setSetting('language', language)
             loadLanguage()
+            sublime.message_dialog('Language ' + language + ' selected successfully')
 
 
 class DocphpOpenManualIndexCommand(sublime_plugin.TextCommand):
@@ -794,3 +818,46 @@ class FinishError(Exception):
 
     """For stopping the HTMLParser"""
     pass
+
+class ThreadProgress():
+    """
+    Animates an indicator, [=   ], in the status area while a thread runs
+
+    :param thread:
+        The thread to track for activity
+
+    :param message:
+        The message to display next to the activity indicator
+
+    :param success_message:
+        The message to display once the thread is complete
+    """
+
+    def __init__(self, thread, message, success_message):
+        self.thread = thread
+        self.message = message
+        self.success_message = success_message
+        self.addend = 1
+        self.size = 8
+        sublime.set_timeout(lambda: self.run(0), 100)
+
+    def run(self, i):
+        if not self.thread.is_alive():
+            if hasattr(self.thread, 'result') and not self.thread.result:
+                sublime.status_message('')
+                return
+            sublime.status_message(self.success_message)
+            return
+
+        before = i % self.size
+        after = (self.size - 1) - before
+
+        sublime.status_message('%s [%s=%s]' % (self.message, ' ' * before, ' ' * after))
+
+        if not after:
+            self.addend = -1
+        if not before:
+            self.addend = 1
+        i += self.addend
+
+        sublime.set_timeout(lambda: self.run(i), 100)
