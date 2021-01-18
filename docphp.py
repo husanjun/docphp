@@ -7,6 +7,7 @@ import tarfile
 import webbrowser
 import time
 import requests
+import mdpopups
 from Default import symbol as sublime_symbol
 from html.parser import HTMLParser
 
@@ -364,13 +365,15 @@ class show_definition(threading.Thread):
         # It seems sublime will core when the output is too long
         # In some cases the value can set to 76200, but we use a 65535 for safety.
         output = output[:65535]
-
-        self.view.show_popup(
+        print(output)
+        popups,popups_classname = self.getCss()
+        mdpopups.show_popup(
+            self.view,
             output,
-            flags=sublime.COOPERATE_WITH_AUTO_COMPLETE | sublime.HTML,
-            location=-1,
+            flags=sublime.COOPERATE_WITH_AUTO_COMPLETE,
+            css=popups,
+            wrapper_class=popups_classname,
             max_width=min(getSetting('popup_max_width'), width),
-            max_height=min(getSetting('popup_max_height'), height - 100),
             on_navigate=self.on_navigate,
             on_hide=self.on_hide
         )
@@ -422,7 +425,19 @@ class show_definition(threading.Thread):
         content = self.formatPopup(content, symbol=symbol, can_back=len(self.history) > 0)
 
         content = content[:65535]
-        self.view.update_popup(content)
+        popups,popups_classname = self.getCss()
+        mdpopups.update_popup(
+            self.view,
+            content,
+            css=popups,
+            wrapper_class=popups_classname,
+        )
+
+    def getCss(self):
+        return (
+            sublime.load_resource('Packages/' + package_name + '/style.css'),
+            'docphp_popup'
+        )
 
     def formatPopup(self, content, symbol, can_back=False):
         if not isinstance(content, str):
@@ -436,9 +451,12 @@ class show_definition(threading.Thread):
         except FinishError:
             pass
         content = parser.output
-        content = '<style>'+sublime.load_resource('Packages/' + package_name + '/style.css') + \
-            '</style><div id="outer"><div id="container">' + content + "</div></div>"
         content = re.sub('<strong><code>([A-Z_]+)</code></strong>', '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
+        # content = re.sub(r'(<[^>\s]+)\s[^>]+?(>)', r'\1\2', content)
+        # re_br = re.compile('<br\s*?/?>')  # 处理换行
+        # re_h = re.compile('</?\w+[^>]*>')  # HTML标签
+        # content = re_br.sub('\n', content)  # 将br转换为换行
+        # content = re_h.sub('', content)  # 去掉HTML 标签
         content = content.replace('#FF8000', '#75715e').replace('#0000BB',
             '#fff').replace('#007700', '#f92672').replace('#DD0000', '#e6db74')
         return content
@@ -501,9 +519,9 @@ class PopupHTMLParser(HTMLParser):
             return
 
         self.stack.append({'tag': tag, 'attrs': attrs})
-        border = self.shall_border(tag, attrs)
-        if border:
-            self.output += '<div class="border border-' + border + '">'
+        # border = self.shall_border(tag, attrs)
+        # if border:
+        #     self.output += '<div class="border border-' + border + '">'
         self.output += self.get_tag_text(tag, attrs)
 
     def handle_endtag(self, tag):
@@ -529,8 +547,8 @@ class PopupHTMLParser(HTMLParser):
                             for lang in languages:
                                 self.output += ' <a href="changeto.' + lang['shortName'] + '">' + lang['nativeName'] + '</a>'
 
-                if self.shall_border(previous['tag'], previous['attrs']):
-                    self.output += '</div>'
+                # if self.shall_border(previous['tag'], previous['attrs']):
+                #     self.output += '</div>'
                 for k in previous['attrs']:
                     v = previous['attrs'][k]
                     if k == 'id' and v == self.symbol:
@@ -562,21 +580,21 @@ class PopupHTMLParser(HTMLParser):
     def handle_charref(self, name):
         self.output += '&' + name + ';'
 
-    def shall_border(self, tag, attrs):
-        if tag.lower() not in ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-            return False
-        for k in attrs:
-            v = attrs[k]
-            if k == 'class':
-                if re.search('\\b(phpcode|classsynopsis|methodsynopsis|note|informaltable)\\b', v):
-                    return 'gray'
-                elif re.search('\\b(tip)\\b', v):
-                    return 'blue'
-                elif re.search('\\b(warning)\\b', v):
-                    return 'pink'
-                elif re.search('\\b(caution)\\b', v):
-                    return 'yellow'
-        return False
+    # def shall_border(self, tag, attrs):
+    #     if tag.lower() not in ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+    #         return False
+    #     for k in attrs:
+    #         v = attrs[k]
+    #         if k == 'class':
+    #             if re.search('\\b(phpcode|classsynopsis|methodsynopsis|note|informaltable)\\b', v):
+    #                 return 'gray'
+    #             elif re.search('\\b(tip)\\b', v):
+    #                 return 'blue'
+    #             elif re.search('\\b(warning)\\b', v):
+    #                 return 'pink'
+    #             elif re.search('\\b(caution)\\b', v):
+    #                 return 'yellow'
+    #     return False
 
     def get_tag_text(self, tag, attrs, is_startend=False):
         if type(attrs) is list:
@@ -669,31 +687,32 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             if not isContinue:
                 readsofar = 0
 
-            headers = {'Range': 'bytes=%d-' % readsofar}
-            resp = requests.get(url, stream=True, verify=False, headers=headers)
-            outputfile = open(filename, 'wb' if not isContinue else 'ab')
-            chunksize = 1024
-            try:
-                self.downloading = name
-                for data in resp.iter_content(chunk_size=chunksize):
-                    if not data:  # finished downloading
-                        break
-                    readsofar += len(data)
-                    outputfile.write(data)  # save to filename
-                    outputfile.flush()
-                    if totalsize:
-                        # report progress
-                        percent = readsofar * 1e2 / totalsize  # assume totalsize > 0
-                        sublime.status_message(package_name + ': %.0f%% checking out %s' % (percent, name,))
-                    else:
-                        kb = readsofar / 1024
-                        sublime.status_message(package_name + ': %.0f KB checking out %s' % (kb, name,))
-            finally:
-                outputfile.close()
-                self.downloading = False
-                if totalsize and readsofar != totalsize:
-                    # os.unlink(filename)
-                    err = 'Download failed'
+            if readsofar < totalsize:
+                headers = {'Range': 'bytes=%d-' % readsofar}
+                resp = requests.get(url, stream=True, verify=False, headers=headers)
+                outputfile = open(filename, 'wb' if not isContinue else 'ab')
+                chunksize = 1024
+                try:
+                    self.downloading = name
+                    for data in resp.iter_content(chunk_size=chunksize):
+                        if not data:  # finished downloading
+                            break
+                        readsofar += len(data)
+                        outputfile.write(data)  # save to filename
+                        outputfile.flush()
+                        if totalsize:
+                            # report progress
+                            percent = readsofar * 1e2 / totalsize  # assume totalsize > 0
+                            sublime.status_message(package_name + ': %.0f%% checking out %s' % (percent, name,))
+                        else:
+                            kb = readsofar / 1024
+                            sublime.status_message(package_name + ': %.0f KB checking out %s' % (kb, name,))
+                finally:
+                    outputfile.close()
+                    self.downloading = False
+                    if totalsize and readsofar != totalsize:
+                        # os.unlink(filename)
+                        err = 'Download failed'
 
         except (requests.exceptions.HTTPError) as e:
             err = '%s: HTTP error %s contacting API' % (__name__, str(e.code))
@@ -707,7 +726,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
                 shutil.rmtree(getI18nCachePath(name))
             newname = getDocphpPath() + 'language/php_manual_' + name + '.tar.gz'
             if os.path.isfile(newname):
-                os.unlink(newname)
+                os.remove(newname)
             os.rename(filename, newname)
             return True
 
