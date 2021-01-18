@@ -451,7 +451,7 @@ class show_definition(threading.Thread):
         except FinishError:
             pass
         content = parser.output
-        content = re.sub('<strong><code>([A-Z_]+)</code></strong>', '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
+        content = re.sub('<strong><code>([0-9A-Z_]+)</code></strong>', '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
         content = re.sub('<span class="initializer">\s+=\s+', '<span class="initializer"><span class="operator"> = </span>', content)
         # content = re.sub(r'(<[^>\s]+)\s[^>]+?(>)', r'\1\2', content)
         # re_br = re.compile('<br\s*?/?>')  # 处理换行
