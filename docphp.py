@@ -452,15 +452,19 @@ class show_definition(threading.Thread):
             pass
         content = parser.output
         content = re.sub('<strong><code>([0-9A-Z_]+)</code></strong>', '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
-        content = re.sub('<span class="initializer">\s+=\s+', '<span class="initializer"><span class="operator"> = </span>', content)
+        content = re.sub(r'<(\w+)\s+style=\"[^"]*\">(.*?)</\1>', '\\2', content, flags=re.S)
+        content = re.sub(r'<(\w+)\s+style=\"[^"]*\">(.*?)</\1>', '\\2', content, flags=re.S)
+        content = re.sub(r'<div class="phpcode"><code>(.*?)</code></div>', '\n\n```php\\1\n```\n', content, flags=re.S)
+        content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>', '\n\n```php\\1\n```\n', content, flags=re.S)
+        content = re.sub(r'<span class="initializer">\s+=\s+', '<span class="initializer"><span class="operator"> = </span>', content)
+        content = re.sub(r'<br\s*?/?>', '\n', content)
         # content = re.sub(r'(<[^>\s]+)\s[^>]+?(>)', r'\1\2', content)
         # re_br = re.compile('<br\s*?/?>')  # 处理换行
         # re_h = re.compile('</?\w+[^>]*>')  # HTML标签
         # content = re_br.sub('\n', content)  # 将br转换为换行
         # content = re_h.sub('', content)  # 去掉HTML 标签
-        content = content.replace('#FF8000', '#75715e').replace('#0000BB',
-            '#fff').replace('#007700', '#f92672').replace('#DD0000', '#e6db74')
-        return content
+        return parser.unescape(content)
+        # return content
 
     def formatPanel(self, content):
         if not isinstance(content, str):
