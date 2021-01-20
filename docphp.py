@@ -216,7 +216,7 @@ def languageExists(languageName=None, fallback=False):
             begin = 'The fallback'
         else:
             begin = 'The'
-        print(getAllLanguages())
+
         show_name = getAllLanguages()[languageName]['name']
         sublime.error_message(begin + ' language "' + show_name +
                               '" has not yet installed.\nYou can use\n\n   DocPHP: checkout language\n\ncommand to checkout a language pack.')
@@ -365,7 +365,7 @@ class show_definition(threading.Thread):
         # It seems sublime will core when the output is too long
         # In some cases the value can set to 76200, but we use a 65535 for safety.
         output = output[:65535]
-        print(output)
+
         popups,popups_classname = self.getCss()
         mdpopups.show_popup(
             self.view,
