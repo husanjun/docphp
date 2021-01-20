@@ -439,6 +439,11 @@ class show_definition(threading.Thread):
             'docphp_popup'
         )
 
+    def handle_code_block(self, obj):
+        content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
+        content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
+        return '\n\n```php{}\n```\n'.format(HTMLParser().unescape(content))
+
     def formatPopup(self, content, symbol, can_back=False):
         if not isinstance(content, str):
             return
@@ -451,20 +456,12 @@ class show_definition(threading.Thread):
         except FinishError:
             pass
         content = parser.output
-        content = re.sub('<strong><code>([0-9A-Z_]+)</code></strong>', '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
-        content = re.sub(r'<(\w+)\s+style=\"[^"]*\">(.*?)</\1>', '\\2', content, flags=re.S)
-        content = re.sub(r'<(\w+)\s+style=\"[^"]*\">(.*?)</\1>', '\\2', content, flags=re.S)
-        content = re.sub(r'<div class="phpcode"><code>(.*?)</code></div>', '\n\n```php\\1\n```\n', content, flags=re.S)
-        content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>', '\n\n```php\\1\n```\n', content, flags=re.S)
+        content = re.sub(r'<strong><code>([0-9A-Z_]+)</code></strong>', '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
         content = re.sub(r'<span class="initializer">\s+=\s+', '<span class="initializer"><span class="operator"> = </span>', content)
-        content = re.sub(r'<br\s*?/?>', '\n', content)
-        # content = re.sub(r'(<[^>\s]+)\s[^>]+?(>)', r'\1\2', content)
-        # re_br = re.compile('<br\s*?/?>')  # 处理换行
-        # re_h = re.compile('</?\w+[^>]*>')  # HTML标签
-        # content = re_br.sub('\n', content)  # 将br转换为换行
-        # content = re_h.sub('', content)  # 去掉HTML 标签
-        return parser.unescape(content)
-        # return content
+        content = re.sub(r'<div class="phpcode">(.*?)</div>', self.handle_code_block, content, flags=re.S)
+        content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>', self.handle_code_block, content, flags=re.S)
+
+        return content
 
     def formatPanel(self, content):
         if not isinstance(content, str):
