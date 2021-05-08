@@ -13,28 +13,21 @@
                         "caption": "DocPHPManualer",
                         "children": [
                             {
-                                "caption": "Settings – Default",
+                                "caption": "Settings",
+                                "command": "edit_settings",
                                 "args": {
-                                    "file": "${packages}/DocPHPManualer/DocPHPManualer.sublime-settings"
-                                },
-                                "command": "open_file"
+                                    "base_file": "${packages}/DocPHPManualer/DocPHPManualer.sublime-settings",
+                                    "default": "// Settings in here override those in \"DocPHPManualer/DocPHPManualer.sublime-settings\"\n{\n\t$0\n}\n"
+                                }
                             },
                             {
-                                "caption": "Settings – User",
+                                "caption": "Key Bindings",
+                                "command": "edit_settings",
                                 "args": {
-                                    "file": "${packages}/User/DocPHPManualer.sublime-settings"
-                                },
-                                "command": "open_file"
-                            },
-                            {
-                                "caption": "Key Bindings – Default",
-                                "args": {
-                                    "file": "${packages}/DocPHPManualer/Default.sublime-keymap"
-                                },
-                                "command": "open_file"
-                            },
-                            {
-                                "caption": "-"
+                                    "base_file": "${packages}/DocPHPManualer/Default.sublime-keymap",
+                                    "user_file": "${packages}/User/Default (${platform}).sublime-keymap",
+                                    "default": "[\n\t$0\n]\n",
+                                }
                             }
                         ]
                     }
