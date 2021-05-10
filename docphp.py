@@ -1,7 +1,8 @@
 import sublime
 import sublime_plugin
 import re
-import os,threading
+import os
+import threading
 import shutil
 import tarfile
 import webbrowser
@@ -276,6 +277,7 @@ def getSymbolFromHtml(symbol):
 
     return output
 
+
 class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
 
     def is_enabled(self, **args):
@@ -294,6 +296,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         thread = show_definition(self.view, edit, event, symbol, force)
         thread.start()
         ThreadProgress(thread, 'Searching', 'Searching Done')
+
 
 class show_definition(threading.Thread):
     def __init__(self, view, edit, event, symbol, force):
@@ -366,7 +369,7 @@ class show_definition(threading.Thread):
         # In some cases the value can set to 76200, but we use a 65535 for safety.
         output = output[:65535]
 
-        popups,popups_classname = self.getCss()
+        popups, popups_classname = self.getCss()
         mdpopups.show_popup(
             self.view,
             output,
@@ -383,7 +386,7 @@ class show_definition(threading.Thread):
         name = 'docphp'
         window = self.view.window()
         panel = window.get_output_panel(name)
-        window.run_command("show_panel", {"panel": "output."+name})
+        window.run_command("show_panel", {"panel": "output." + name})
         panel.set_read_only(False)
         panel.insert(edit, panel.size(), output + '\n')
         panel.set_read_only(True)
@@ -425,7 +428,7 @@ class show_definition(threading.Thread):
         content = self.formatPopup(content, symbol=symbol, can_back=len(self.history) > 0)
 
         content = content[:65535]
-        popups,popups_classname = self.getCss()
+        popups, popups_classname = self.getCss()
         mdpopups.update_popup(
             self.view,
             content,
@@ -499,7 +502,6 @@ class PopupHTMLParser(HTMLParser):
         for k, v in attrs:
             ret[k] = v
         return ret
-
 
     def handle_starttag(self, tag, attrs):
         attrs = self.parseAttrs(attrs)
@@ -684,7 +686,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
 
             # if readsofar:
             if readsofar:
-                isContinue = sublime.ok_cancel_dialog('Whether to continue with an uncompleted package, choosing cancel will be downloaded from the beginning','continue')
+                isContinue = sublime.ok_cancel_dialog('Whether to continue with an uncompleted package, choosing cancel will be downloaded from the beginning', 'continue')
 
             if not isContinue:
                 readsofar = 0
@@ -839,6 +841,7 @@ class FinishError(Exception):
 
     """For stopping the HTMLParser"""
     pass
+
 
 class ThreadProgress():
     """
