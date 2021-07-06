@@ -37,9 +37,8 @@ def plugin_loaded():
     language = currentSettings.get('language')
     currentView = sublime.active_window().active_view()
 
-    docphpPath = getDocphpPath()
-    if not os.path.isdir(docphpPath + 'language'):
-        os.makedirs(docphpPath + 'language')
+    if not os.path.isdir(getLanguagePath()):
+        os.makedirs(getLanguagePath())
 
     if not callable(sublime_symbol.symbol_at_point) or not callable(sublime_symbol.navigate_to_symbol):
         sublime.error_message(
@@ -76,7 +75,7 @@ def setSetting(key, value):
 
 
 def getAllLanguages():
-    return sublime.decode_value(sublime.load_resource('Packages/' + package_name + '/languages.json'))
+    return sublime.decode_value(sublime.load_resource('Packages/{}/languages.json'.format(package_name)))
 
 
 def getLanguageList(languageName=None, format='all', getAll=True):
@@ -123,7 +122,7 @@ def decodeEntity(xml, category='iso'):
             "html": "HtmlEntities.json",
         }
         forward = sublime.decode_value(sublime.load_resource(
-            'Packages/' + package_name + '/' + resourceMap[category]))
+            'Packages/{}/'.format(package_name, resourceMap[category])))
 
         reverse = dict((v, k) for k, v in forward.items())
         entities[category] = (forward, reverse)
@@ -142,17 +141,19 @@ def decodeEntity(xml, category='iso'):
 
 
 def getDocphpPath():
-    return sublime.cache_path() + '/' + package_name + '/'
+    return os.path.join(sublime.cache_path(), package_name)
+
+
+def getLanguagePath():
+    return os.path.join(getDocphpPath(), 'language')
 
 
 def getTarGzPath():
-    return '{}language/php_manual_{}.tar.gz'.format(getDocphpPath(), language)
+    return os.path.join(getLanguagePath(), 'php_manual_{}.tar.gz'.format(language))
 
 
 def getI18nCachePath(languageName=None):
-    if not languageName:
-        languageName = language
-    return '{}language/{}/'.format(getDocphpPath(), languageName)
+    return os.path.join(getLanguagePath(), languageName if languageName else '')
 
 
 def getTarHandler():
