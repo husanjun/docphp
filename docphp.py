@@ -75,7 +75,7 @@ def setSetting(key, value):
 
 
 def getAllLanguages():
-    return sublime.decode_value(sublime.load_resource('Packages/{}/languages.json'.format(package_name)))
+    return sublime.decode_value(sublime.load_resource(os.path.join('Packages', package_name, 'languages.json')))
 
 
 def getLanguageList(languageName=None, format='all', getAll=True):
@@ -122,7 +122,7 @@ def decodeEntity(xml, category='iso'):
             "html": "HtmlEntities.json",
         }
         forward = sublime.decode_value(sublime.load_resource(
-            'Packages/{}/'.format(package_name, resourceMap[category])))
+            os.path.join('Packages', package_name, resourceMap[category])))
 
         reverse = dict((v, k) for k, v in forward.items())
         entities[category] = (forward, reverse)
