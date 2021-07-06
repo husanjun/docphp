@@ -1,7 +1,30 @@
 [
-    {"caption": "DocPHP: Show Definition", "command": "docphp_show_definition"},
-    {"caption": "DocPHP: Checkout Language", "command": "docphp_checkout_language"},
-    {"caption": "DocPHP: Select Language", "command": "docphp_select_language"},
-    {"caption": "DocPHP: Open Manual Index Page", "command": "docphp_open_manual_index"},
-    {"caption": "DocPHP: Search Manual", "command": "docphp_search"},
+    {
+        "caption": "DocPHP: Show Definition",
+        "command": "docphp_show_definition"
+    },
+    {
+        "caption": "DocPHP: Checkout Language",
+        "command": "docphp_checkout_language"
+    },
+    {
+        "caption": "DocPHP: Select Language",
+        "command": "docphp_select_language"
+    },
+    {
+        "caption": "DocPHP: Open Manual Index Page",
+        "command": "docphp_open_manual_index"
+    },
+    {
+        "caption": "DocPHP: Search Manual",
+        "command": "docphp_search"
+    },
+    {
+        "caption": "DocPHP: Settings",
+        "command": "edit_settings",
+        "args": {
+            "base_file": "${packages}/DocPHPManualer/DocPHPManualer.sublime-settings",
+            "default": "// Settings in here override those in \"DocPHPManualer/DocPHPManualer.sublime-settings\"\n\n{\n\t$0\n}\n",
+        },
+    },
 ]
