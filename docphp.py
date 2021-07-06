@@ -2,7 +2,6 @@ import sublime
 import sublime_plugin
 import re
 import os
-import threading
 import shutil
 import tarfile
 import webbrowser
@@ -11,13 +10,16 @@ import requests
 import mdpopups
 from Default import symbol as sublime_symbol
 from html.parser import HTMLParser
+from sublime_lib import ActivityIndicator
+from typing import Optional
+from package_control import events
 
 package_name = 'DocPHPManualer'
 setting_file = package_name + '.sublime-settings'
 
 docphp_languages = {}
-currentView = False
-currentSettings = None
+currentView = None  # type:Optional[sublime.View]
+currentSettings = None  # type:Optional[sublime.Settings]
 openfiles = {}
 entities = {
     "iso": False,
@@ -40,12 +42,12 @@ def plugin_loaded():
         os.makedirs(docphpPath + 'language')
 
     if not callable(sublime_symbol.symbol_at_point) or not callable(sublime_symbol.navigate_to_symbol):
-        sublime.error_message('Cannot find symbol_at_point from Default.sublime-package\n\nPlease restore the file which usually replaced by outdated localizations')
+        sublime.error_message(
+            'Cannot find symbol_at_point from Default.sublime-package\n\nPlease restore the file which usually replaced by outdated localizations')
 
-    from package_control import events
-
-    if events.install(package_name) or not language:
-        currentView.run_command('docphp_checkout_language', {"is_init": True, "set_fallback": True})
+    if (events.install(package_name) or not language) and currentView:
+        currentView.run_command('docphp_checkout_language', {
+                                "is_init": True, "set_fallback": True})
 
 
 def plugin_unloaded():
@@ -57,19 +59,19 @@ def plugin_unloaded():
                 print(e)
     sublime.save_settings(setting_file)
 
-    from package_control import events
-
     if events.remove(package_name):
         if os.path.isdir(getDocphpPath()):
             shutil.rmtree(getDocphpPath())
 
 
 def getSetting(key):
-    return currentSettings.get(key)
+    if currentSettings:
+        return currentSettings.get(key)
 
 
 def setSetting(key, value):
-    currentSettings.set(key, value)
+    if currentSettings:
+        currentSettings.set(key, value)
     sublime.save_settings(setting_file)
 
 
@@ -81,7 +83,7 @@ def getLanguageList(languageName=None, format='all', getAll=True):
     if not getAll:
         languageName = getSetting('languages')
 
-    if languageName == None:
+    if languageName is None:
         dic = []
     elif isinstance(languageName, str):
         dic = [languageName]
@@ -93,10 +95,11 @@ def getLanguageList(languageName=None, format='all', getAll=True):
     languageList = []
     index = None
     for k, v in languages:
-        if languageName == None or k in dic:
+        if languageName is None or k in dic:
             index = len(languageList)
             if format == 'all':
-                languageList.append(k + ' ' + v['name'] + ' (' + v['nativeName'] + ')')
+                languageList.append(
+                    k + ' ' + v['name'] + ' (' + v['nativeName'] + ')')
             elif format == 'name':
                 languageList.append(v['name'])
             elif format == 'nativeName':
@@ -119,7 +122,8 @@ def decodeEntity(xml, category='iso'):
             "iso": "IsoEntities.json",
             "html": "HtmlEntities.json",
         }
-        forward = sublime.decode_value(sublime.load_resource('Packages/' + package_name + '/' + resourceMap[category]))
+        forward = sublime.decode_value(sublime.load_resource(
+            'Packages/' + package_name + '/' + resourceMap[category]))
 
         reverse = dict((v, k) for k, v in forward.items())
         entities[category] = (forward, reverse)
@@ -142,13 +146,13 @@ def getDocphpPath():
 
 
 def getTarGzPath():
-    return getDocphpPath() + 'language/php_manual_' + language + '.tar.gz'
+    return '{}language/php_manual_{}.tar.gz'.format(getDocphpPath(), language)
 
 
 def getI18nCachePath(languageName=None):
     if not languageName:
         languageName = language
-    return getDocphpPath() + 'language/' + languageName + '/'
+    return '{}language/{}/'.format(getDocphpPath(), languageName)
 
 
 def getTarHandler():
@@ -209,8 +213,9 @@ def getJsonOrGenerate(name, callback):
 def languageExists(languageName=None, fallback=False):
     if not languageName:
         languageName = language
-    if not language:
-        currentView.run_command('docphp_checkout_language', {"is_init": True, "set_fallback": True})
+    if not language and currentView:
+        currentView.run_command('docphp_checkout_language', {
+                                "is_init": True, "set_fallback": True})
         return False
     if languageName not in docphp_languages and not loadLanguage():
         if fallback:
@@ -279,6 +284,11 @@ def getSymbolFromHtml(symbol):
 
 
 class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
+    history = []
+    currentSymbol = ''
+    projectSymbols = []
+    window = False
+    projectView = False
 
     def is_enabled(self, **args):
         selection = self.view.sel()
@@ -293,43 +303,19 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         return True
 
     def run(self, edit, event=None, symbol=None, force=False):
-        thread = show_definition(self.view, edit, event, symbol, force)
-        thread.start()
-        ThreadProgress(thread, 'Searching', 'Searching Done')
 
-
-class show_definition(threading.Thread):
-    def __init__(self, view, edit, event, symbol, force):
-        self.view = view
-        self.edit = edit
-        self.event = event
-        self.symbol = symbol
-        self.force = force
-        threading.Thread.__init__(self)
-
-    history = []
-    currentSymbol = ''
-    projectSymbols = []
-    window = False
-    projectView = False
-
-    def run(self):
         global language, currentView
         view = self.view
-        edit = self.edit
-        event = self.event
-        symbol = self.symbol
-        force = self.force
         currentView = view
         pt = False
 
         language = getSetting('language')
 
         if not language:
-            view.window().run_command('docphp_checkout_language')
+            view.run_command('docphp_checkout_language')
             return
-
-        if symbol == None:
+        start_indicator(view, '{}: Searching...'.format(package_name))
+        if symbol is None:
             if event:
                 pt = view.window_to_text((event["x"], event["y"]))
             else:
@@ -341,15 +327,16 @@ class show_definition(threading.Thread):
 
         # symbol = 'basename'
 
-        translatedSymbol, symbolDescription = getSymbolDescription(translatedSymbol)
+        translatedSymbol, symbolDescription = getSymbolDescription(
+            translatedSymbol)
 
         if not symbolDescription:
             if getSetting('prompt_when_not_found'):
-                view.show_popup('Not found', sublime.COOPERATE_WITH_AUTO_COMPLETE)
-                return
+                self.show_popup(
+                    sublime.COOPERATE_WITH_AUTO_COMPLETE, 'Not found')
             return
 
-        if getSetting('use_panel') == False:
+        if getSetting('use_panel') is False:
             self.show_popup(translatedSymbol, symbolDescription)
         else:
             self.show_panel(translatedSymbol, symbolDescription, edit)
@@ -377,9 +364,11 @@ class show_definition(threading.Thread):
             css=popups,
             wrapper_class=popups_classname,
             max_width=min(getSetting('popup_max_width'), width),
+            max_height=min(getSetting('popup_max_height'), height),
             on_navigate=self.on_navigate,
             on_hide=self.on_hide
         )
+        stop_indicator()
 
     def show_panel(self, symbol, symbolDescription, edit):
         output = self.formatPanel(symbolDescription)
@@ -403,7 +392,8 @@ class show_definition(threading.Thread):
         m = re.search('^(changeto|constant)\.(.*)', url)
         if m:
             if m.group(1) == 'changeto':
-                symbol, content = getSymbolDescription(self.currentSymbol, m.group(2))
+                symbol, content = getSymbolDescription(
+                    self.currentSymbol, m.group(2))
             else:
                 self.view.run_command('docphp_insert', {"string": m.group(2)})
                 self.view.hide_popup()
@@ -417,7 +407,8 @@ class show_definition(threading.Thread):
             self.currentSymbol = symbol
         if not symbol:
             if getSetting('prompt_when_not_found'):
-                self.view.show_popup('Not found', sublime.COOPERATE_WITH_AUTO_COMPLETE)
+                self.view.show_popup(
+                    'Not found', sublime.COOPERATE_WITH_AUTO_COMPLETE)
                 return
             return
         symbol, content = getSymbolDescription(symbol)
@@ -425,7 +416,8 @@ class show_definition(threading.Thread):
         if content == False:
             return False
 
-        content = self.formatPopup(content, symbol=symbol, can_back=len(self.history) > 0)
+        content = self.formatPopup(
+            content, symbol=symbol, can_back=len(self.history) > 0)
 
         content = content[:65535]
         popups, popups_classname = self.getCss()
@@ -459,10 +451,14 @@ class show_definition(threading.Thread):
         except FinishError:
             pass
         content = parser.output
-        content = re.sub(r'<strong><code>([0-9A-Z_]+)</code></strong>', '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
-        content = re.sub(r'<span class="initializer">\s+=\s+', '<span class="initializer"><span class="operator"> = </span>', content)
-        content = re.sub(r'<div class="phpcode">(.*?)</div>', self.handle_code_block, content, flags=re.S)
-        content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>', self.handle_code_block, content, flags=re.S)
+        content = re.sub(r'<strong><code>([0-9A-Z_]+)</code></strong>',
+                         '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
+        content = re.sub(r'<span class="initializer">\s+=\s+',
+                         '<span class="initializer"><span class="operator"> = </span>', content)
+        content = re.sub(r'<div class="phpcode">(.*?)</div>',
+                         self.handle_code_block, content, flags=re.S)
+        content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>',
+                         self.handle_code_block, content, flags=re.S)
 
         return content
 
@@ -471,7 +467,8 @@ class show_definition(threading.Thread):
             return
         content = decodeEntity(content)
         content = re.sub('\s+', ' ', content)
-        content = re.sub('<(br\s*/?|/p|/div|/li|(div|p)\s[^<>]*|(div|p))>', '\n', content)
+        content = re.sub(
+            '<(br\s*/?|/p|/div|/li|(div|p)\s[^<>]*|(div|p))>', '\n', content)
         content = re.sub('<.*?>', '', content)
         content = re.sub('\s+\n\s*\n\s+', '\n\n', content)
         content = re.sub('^\s+', '', content, count=1)
@@ -485,7 +482,8 @@ class PopupHTMLParser(HTMLParser):
     can_back = False
     stack = []
     output = ''
-    as_div = ['blockquote', 'tr', 'li', 'ul', 'dl', 'dt', 'dd', 'table', 'tbody', 'thead']
+    as_div = ['blockquote', 'tr', 'li', 'ul', 'dl',
+              'dt', 'dd', 'table', 'tbody', 'thead']
     strip = ['td']
     started = False
     navigate_rendered = False
@@ -544,12 +542,16 @@ class PopupHTMLParser(HTMLParser):
                         self.navigate_rendered = True
                         self.output += ('<a href="history.back">back</a>' if self.can_back else 'back') + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="http://php.net/manual/' + \
                             self.language + '/' + self.symbol + '.php">online</a>' + \
-                            '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + re.sub('.*?(<a.*?</a>).*', '\\1', self.navigate_up)
-                        languages, _ = getLanguageList(format='raw', getAll=False)
+                            '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + \
+                            re.sub('.*?(<a.*?</a>).*', '\\1', self.navigate_up)
+                        languages, _ = getLanguageList(
+                            format='raw', getAll=False)
                         if len(languages) > 1:
                             self.output += '&nbsp;&nbsp;&nbsp;&nbsp;Change language:'
                             for lang in languages:
-                                self.output += ' <a href="changeto.' + lang['shortName'] + '">' + lang['nativeName'] + '</a>'
+                                self.output += ' <a href="changeto.' + \
+                                    lang['shortName'] + '">' + \
+                                    lang['nativeName'] + '</a>'
 
                 # if self.shall_border(previous['tag'], previous['attrs']):
                 #     self.output += '</div>'
@@ -619,7 +621,8 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         currentView = view
 
         if self.downloading:
-            sublime.message_dialog('Another progress is working for checkout ' + self.downloading + '. Please try again later.')
+            sublime.message_dialog(
+                'Another progress is working for checkout {}. Please try again later.'.format(self.downloading))
             return
 
         self.languageList, index = getLanguageList(languageName)
@@ -628,10 +631,11 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         if languageName:
             self.updateLanguage(index)
         else:
-            currentView.window().show_quick_panel(self.languageList, self.updateLanguage, sublime.KEEP_OPEN_ON_FOCUS_LOST)
+            currentView.window().show_quick_panel(self.languageList,
+                                                  self.updateLanguage, sublime.KEEP_OPEN_ON_FOCUS_LOST)
 
     def updateLanguage(self, index=None):
-        if index == -1 or index == None:
+        if index == -1 or index is None:
             return
         languageName = re.search('^\w+', self.languageList[index]).group(0)
 
@@ -648,7 +652,8 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
 
         setSetting('language', languageName)
         language = languageName
-        languageSettings = currentSettings.get('languages')
+        if currentSettings:
+            languageSettings = currentSettings.get('languages')
 
         languageSettings[languageName] = 'gz'
 
@@ -658,7 +663,8 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
 
         loadLanguage()
 
-        sublime.message_dialog('Language ' + languageName + ' is checked out')
+        sublime.message_dialog(
+            'Language {} is checked out'.format(languageName))
 
     def downloadLanguageGZ(self, name):
         requests.packages.urllib3.disable_warnings()
@@ -666,12 +672,14 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         try:
             url = 'https://php.net/distributions/manual/php_manual_' + name + '.tar.gz'
 
-            filename = getDocphpPath() + 'language/php_manual_' + name + '.tar.gz.downloading'
+            filename = getDocphpPath() + 'language/php_manual_' + \
+                name + '.tar.gz.downloading'
 
             response = requests.get(url, stream=True, verify=False)
             try:
                 if response.headers['Content-Length']:
-                    totalsize = int(response.headers['Content-Length'])  # assume correct header
+                    # assume correct header
+                    totalsize = int(response.headers['Content-Length'])
                 else:
                     totalsize = None
             except NameError:
@@ -686,14 +694,16 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
 
             # if readsofar:
             if readsofar:
-                isContinue = sublime.ok_cancel_dialog('Whether to continue with an uncompleted package, choosing cancel will be downloaded from the beginning', 'continue')
+                isContinue = sublime.ok_cancel_dialog(
+                    'Whether to continue with an uncompleted package, choosing cancel will be downloaded from the beginning', 'continue')
 
             if not isContinue:
                 readsofar = 0
 
             if readsofar < totalsize:
                 headers = {'Range': 'bytes=%d-' % readsofar}
-                resp = requests.get(url, stream=True, verify=False, headers=headers)
+                resp = requests.get(
+                    url, stream=True, verify=False, headers=headers)
                 outputfile = open(filename, 'wb' if not isContinue else 'ab')
                 chunksize = 1024
                 try:
@@ -707,10 +717,12 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
                         if totalsize:
                             # report progress
                             percent = readsofar * 1e2 / totalsize  # assume totalsize > 0
-                            sublime.status_message(package_name + ': %.0f%% checking out %s' % (percent, name,))
+                            sublime.status_message(
+                                package_name + ': %.0f%% checking out %s' % (percent, name,))
                         else:
                             kb = readsofar / 1024
-                            sublime.status_message(package_name + ': %.0f KB checking out %s' % (kb, name,))
+                            sublime.status_message(
+                                package_name + ': %.0f KB checking out %s' % (kb, name,))
                 finally:
                     outputfile.close()
                     self.downloading = False
@@ -721,7 +733,8 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         except (requests.exceptions.HTTPError) as e:
             err = '%s: HTTP error %s contacting API' % (__name__, str(e.code))
         except (requests.exceptions.ConnectionError) as e:
-            err = '%s: ConnectionError error %s contacting API' % (__name__, str(e.reason))
+            err = '%s: ConnectionError error %s contacting API' % (
+                __name__, str(e.reason))
         except Exception as e:
             err = e.__class__.__name__
 
@@ -734,7 +747,8 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             os.rename(filename, newname)
             return True
 
-        sublime.message_dialog('Language ' + name + ' checkout failed. Please try again.')
+        sublime.message_dialog('Language ' + name +
+                               ' checkout failed. Please try again.')
 
         return False
 
@@ -750,7 +764,8 @@ class DocphpSelectLanguageCommand(sublime_plugin.TextCommand):
 
         self.languageList, _ = getLanguageList(getAll=False)
 
-        currentView.window().show_quick_panel(self.languageList, self.selectLanguageCallback)
+        currentView.window().show_quick_panel(
+            self.languageList, self.selectLanguageCallback)
 
     def selectLanguageCallback(self, index):
         global language
@@ -758,7 +773,8 @@ class DocphpSelectLanguageCommand(sublime_plugin.TextCommand):
             language = re.search('^\w+', self.languageList[index]).group(0)
             setSetting('language', language)
             loadLanguage()
-            sublime.message_dialog('Language ' + language + ' selected successfully')
+            sublime.message_dialog(
+                'Language ' + language + ' selected successfully')
 
 
 class DocphpOpenManualIndexCommand(sublime_plugin.TextCommand):
@@ -766,7 +782,8 @@ class DocphpOpenManualIndexCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         global currentView
         currentView = self.view
-        self.view.run_command('docphp_show_definition', {"symbol": 'index', "force": True})
+        self.view.run_command('docphp_show_definition', {
+                              "symbol": 'index', "force": True})
 
 
 class DocphpSearchCommand(sublime_plugin.TextCommand):
@@ -787,12 +804,14 @@ class DocphpSearchCommand(sublime_plugin.TextCommand):
         if at_point:
             symbol = view.substr(view.word(view.sel()[0]))
 
-        files = list(map(lambda file: re.sub('-', '_', file), docphp_languages[language]["symbolList"].keys()))
+        files = list(map(lambda file: re.sub('-', '_', file),
+                     docphp_languages[language]["symbolList"].keys()))
         files.sort()
 
         def show(index):
-            if index != -1:
-                currentView.run_command('docphp_show_definition', {"symbol": files[index], "force": True})
+            if index != -1 and currentView:
+                currentView.run_command('docphp_show_definition', {
+                                        "symbol": files[index], "force": True})
 
         selected_index = -1
         if event:
@@ -824,17 +843,20 @@ class DocPHPListener(sublime_plugin.EventListener):
         currentView = view
         self.prevTime = time.time()
         if not self.delaying:
-            sublime.set_timeout_async(self.doAutoShow, getSetting('auto_delay') + 50)
+            sublime.set_timeout_async(
+                self.doAutoShow, getSetting('auto_delay') + 50)
             self.delaying = True
 
     def doAutoShow(self):
         delayTime = getSetting('auto_delay')
         if (time.time() - self.prevTime) * 1000 > delayTime:
             self.delaying = False
-            if not currentView.is_popup_visible():
-                currentView.run_command('docphp_show_definition')
+            if currentView:
+                if not currentView.is_popup_visible():
+                    currentView.run_command('docphp_show_definition')
         else:
-            sublime.set_timeout_async(self.doAutoShow, int(delayTime - (time.time() - self.prevTime) * 1000) + 50)
+            sublime.set_timeout_async(self.doAutoShow, int(
+                delayTime - (time.time() - self.prevTime) * 1000) + 50)
 
 
 class FinishError(Exception):
@@ -843,45 +865,20 @@ class FinishError(Exception):
     pass
 
 
-class ThreadProgress():
-    """
-    Animates an indicator, [=   ], in the status area while a thread runs
+activity_indicator = None
 
-    :param thread:
-        The thread to track for activity
 
-    :param message:
-        The message to display next to the activity indicator
+def start_indicator(view, msg) -> None:
+    global activity_indicator
+    if activity_indicator:
+        activity_indicator.label = msg
+    else:
+        activity_indicator = ActivityIndicator(view, msg)
+        activity_indicator.start()
 
-    :param success_message:
-        The message to display once the thread is complete
-    """
 
-    def __init__(self, thread, message, success_message):
-        self.thread = thread
-        self.message = message
-        self.success_message = success_message
-        self.addend = 1
-        self.size = 8
-        sublime.set_timeout(lambda: self.run(0), 100)
-
-    def run(self, i):
-        if not self.thread.is_alive():
-            if hasattr(self.thread, 'result') and not self.thread.result:
-                sublime.status_message('')
-                return
-            sublime.status_message(self.success_message)
-            return
-
-        before = i % self.size
-        after = (self.size - 1) - before
-
-        sublime.status_message('%s [%s=%s]' % (self.message, ' ' * before, ' ' * after))
-
-        if not after:
-            self.addend = -1
-        if not before:
-            self.addend = 1
-        i += self.addend
-
-        sublime.set_timeout(lambda: self.run(i), 100)
+def stop_indicator() -> None:
+    global activity_indicator
+    if activity_indicator:
+        activity_indicator.stop()
+        activity_indicator = None
