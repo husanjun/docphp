@@ -42,11 +42,11 @@ def plugin_loaded():
 
     if not callable(sublime_symbol.symbol_at_point) or not callable(sublime_symbol.navigate_to_symbol):
         sublime.error_message(
-            'Cannot find symbol_at_point from Default.sublime-package\n\nPlease restore the file which usually replaced by outdated localizations')
+            f"Cannot find symbol_at_point from Default.sublime-package\n\n"
+            "Please restore the file which usually replaced by outdated localizations")
 
     if (events.install(package_name) or not language) and currentView:
-        currentView.run_command('docphp_checkout_language', {
-                                "is_init": True, "set_fallback": True})
+        currentView.run_command('docphp_checkout_language', {"is_init": True, "set_fallback": True})
 
 
 def plugin_unloaded():
@@ -134,7 +134,7 @@ def decodeEntity(xml, category='iso'):
                 return reverse[int(entity)]
             else:
                 return chr(forward[entity])
-        except:
+        except KeyError:
             return match.group(0)
     xml = re.sub('&([a-zA-Z0-9]+);', parseEntity, xml)
     return xml
@@ -632,8 +632,9 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         if languageName:
             self.updateLanguage(index)
         else:
-            currentView.window().show_quick_panel(self.languageList,
-                                                  self.updateLanguage, sublime.KEEP_OPEN_ON_FOCUS_LOST)
+            if currentView:
+                currentView.window().show_quick_panel(self.languageList,
+                                                      self.updateLanguage, sublime.KEEP_OPEN_ON_FOCUS_LOST)
 
     def updateLanguage(self, index=None):
         if index == -1 or index is None:
@@ -653,6 +654,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
 
         setSetting('language', languageName)
         language = languageName
+        languageSettings = {}
         if currentSettings:
             languageSettings = currentSettings.get('languages')
 
@@ -672,7 +674,6 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         err = None
         try:
             url = 'https://php.net/distributions/manual/php_manual_' + name + '.tar.gz'
-
             filename = getDocphpPath() + 'language/php_manual_' + \
                 name + '.tar.gz.downloading'
 
@@ -682,11 +683,11 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
                     # assume correct header
                     totalsize = int(response.headers['Content-Length'])
                 else:
-                    totalsize = None
+                    totalsize = 0
             except NameError:
-                totalsize = None
+                totalsize = 0
             except KeyError:
-                totalsize = None
+                totalsize = 0
 
             readsofar = 0
             isContinue = False
