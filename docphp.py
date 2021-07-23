@@ -225,8 +225,8 @@ def languageExists(languageName=None, fallback=False):
             begin = 'The'
 
         show_name = getAllLanguages()[languageName]['name']
-        sublime.error_message(begin + ' language "' + show_name +
-                              '" has not yet installed.\nYou can use\n\n   DocPHP: checkout language\n\ncommand to checkout a language pack.')
+        sublime.error_message(('{} language "{}" has not yet installed.\nYou can use\n\n  DocPHP: checkout language\n\n'
+                               'command to checkout a language pack.').format(begin, show_name))
         return False
     return True
 
@@ -267,8 +267,7 @@ def getSymbolFromHtml(symbol):
 
     member = tar.getmember(docphp_languages[language]["symbolList"][symbol])
     f = tar.extractfile(member)
-    output = f.read().decode(errors='ignore')
-
+    output = f.read().decode(errors='ignore') if f else ''
     dic = {
         '&mdash;': chr(8212),
         '&quot;': '"',
