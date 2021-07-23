@@ -612,16 +612,15 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         if languageName:
             self.updateLanguage(index)
         else:
-            if currentView:
-                currentView.window().show_quick_panel(
-                    self.languageList, self.updateLanguage, sublime.KEEP_OPEN_ON_FOCUS_LOST)
+            window = currentView.window()
+            if window:
+                window.show_quick_panel(self.languageList, self.updateLanguage, sublime.KEEP_OPEN_ON_FOCUS_LOST)
 
-    def updateLanguage(self, index: int) -> None:
+    def updateLanguage(self, index=None):
         if index == -1 or index is None:
             return
-        languageName = re.search(r'^\w+', self.languageList[index]).group(0)
-
-        self.languageName = languageName
+        languageName = re.search(r'^\w+', self.languageList[index]) if self.languageList else ''
+        self.languageName = languageName.group(0) if languageName else ''
         sublime.set_timeout_async(self.checkoutLanguage, 0)
 
     def checkoutLanguage(self):
@@ -740,16 +739,19 @@ class DocphpSelectLanguageCommand(sublime_plugin.TextCommand):
         currentView = view
 
         self.languageList, _ = getLanguageList(getAll=False)
-
-        currentView.window().show_quick_panel(self.languageList, self.selectLanguageCallback)
+        window = currentView.window()
+        if window:
+            window.show_quick_panel(self.languageList, self.selectLanguageCallback)
 
     def selectLanguageCallback(self, index):
         global language
         if index != -1:
-            language = re.search('^\w+', self.languageList[index]).group(0)
-            setSetting('language', language)
-            loadLanguage()
-            sublime.message_dialog('Language ' + language + ' selected successfully')
+            language = re.search(r'^\w+', self.languageList[index])
+            if language:
+                language = language.group(0)
+                setSetting('language', language)
+                loadLanguage()
+                sublime.message_dialog('Language ' + language + ' selected successfully')
 
 
 class DocphpOpenManualIndexCommand(sublime_plugin.TextCommand):
