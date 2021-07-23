@@ -1,3 +1,9 @@
+from package_control import events
+from typing import Optional
+from sublime_lib import ActivityIndicator
+from html.parser import HTMLParser
+from Default import symbol as sublime_symbol
+import mdpopups
 import sublime
 import sublime_plugin
 import re
@@ -7,12 +13,8 @@ import tarfile
 import webbrowser
 import time
 import requests
-import mdpopups
-from Default import symbol as sublime_symbol
-from html.parser import HTMLParser
-from sublime_lib import ActivityIndicator
-from typing import Optional
-from package_control import events
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 package_name = 'DocPHPManualer'
 setting_file = package_name + '.sublime-settings'
@@ -22,8 +24,8 @@ currentView = None  # type:Optional[sublime.View]
 currentSettings = None  # type:Optional[sublime.Settings]
 openfiles = {}
 entities = {
-    "iso": False,
-    "html": False
+    "iso": tuple(),
+    "html": tuple()
 }
 
 language = ''
@@ -42,7 +44,7 @@ def plugin_loaded():
 
     if not callable(sublime_symbol.symbol_at_point) or not callable(sublime_symbol.navigate_to_symbol):
         sublime.error_message(
-            f"Cannot find symbol_at_point from Default.sublime-package\n\n"
+            "Cannot find symbol_at_point from Default.sublime-package\n\n"
             "Please restore the file which usually replaced by outdated localizations")
 
     if (events.install(package_name) or not language) and currentView:
@@ -148,8 +150,8 @@ def getLanguagePath():
     return os.path.join(getDocphpPath(), 'language')
 
 
-def getTarGzPath():
-    return os.path.join(getLanguagePath(), 'php_manual_{}.tar.gz'.format(language))
+def getTarGzPath(lang=None):
+    return os.path.join(getLanguagePath(), 'php_manual_{}.tar.gz'.format(lang if lang else language))
 
 
 def getI18nCachePath(languageName=None):
@@ -797,7 +799,9 @@ class DocphpSearchCommand(sublime_plugin.TextCommand):
                     break
                 except ValueError:
                     pass
-        currentView.window().show_quick_panel(files, show, selected_index=selected_index)
+        window = currentView.window()
+        if window:
+            window.show_quick_panel(files, show, selected_index=selected_index)
 
 
 class DocphpInsertCommand(sublime_plugin.TextCommand):
