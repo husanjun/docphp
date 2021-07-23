@@ -54,7 +54,7 @@ def plugin_unloaded():
         try:
             openfiles[k].close()
         except Exception as e:
-            if getSetting('debug'):
+            if getSetting('debug', False):
                 print(e)
     sublime.save_settings(setting_file)
 
@@ -63,9 +63,10 @@ def plugin_unloaded():
             shutil.rmtree(getDocphpPath())
 
 
-def getSetting(key):
+def getSetting(key, default=None):
     if currentSettings:
         return currentSettings.get(key)
+    return default
 
 
 def setSetting(key, value):
@@ -97,8 +98,7 @@ def getLanguageList(languageName=None, format='all', getAll=True):
         if languageName is None or k in dic:
             index = len(languageList)
             if format == 'all':
-                languageList.append(
-                    k + ' ' + v['name'] + ' (' + v['nativeName'] + ')')
+                languageList.append(k + ' ' + v['name'] + ' (' + v['nativeName'] + ')')
             elif format == 'name':
                 languageList.append(v['name'])
             elif format == 'nativeName':
@@ -179,9 +179,8 @@ def loadLanguage():
 
     def generate():
         symbols = {}
-
         for tarinfo in tar:
-            m = re.search('^php-chunked-xhtml/(.*)\.html$', tarinfo.name)
+            m = re.search('^php-chunked-xhtml/(.*)\\.html$', tarinfo.name)
             if m:
                 symbols[m.group(1)] = m.group(0)
         return symbols
@@ -215,8 +214,7 @@ def languageExists(languageName=None, fallback=False):
     if not languageName:
         languageName = language
     if not language and currentView:
-        currentView.run_command('docphp_checkout_language', {
-                                "is_init": True, "set_fallback": True})
+        currentView.run_command('docphp_checkout_language', {"is_init": True, "set_fallback": True})
         return False
     if languageName not in docphp_languages and not loadLanguage():
         if fallback:
@@ -303,14 +301,12 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         return True
 
     def run(self, edit, event=None, symbol=None, force=False):
-
         global language, currentView
         view = self.view
         currentView = view
         pt = False
 
         language = getSetting('language')
-
         if not language:
             view.run_command('docphp_checkout_language')
             return
@@ -327,8 +323,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
 
         # symbol = 'basename'
 
-        translatedSymbol, symbolDescription = getSymbolDescription(
-            translatedSymbol)
+        translatedSymbol, symbolDescription = getSymbolDescription(translatedSymbol)
 
         if not symbolDescription:
             if getSetting('prompt_when_not_found'):
@@ -354,7 +349,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
 
         # It seems sublime will core when the output is too long
         # In some cases the value can set to 76200, but we use a 65535 for safety.
-        output = output[:65535]
+        output = output[:65535] if output else ''
 
         popups, popups_classname = self.getCss()
         mdpopups.show_popup(
@@ -363,8 +358,8 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
             flags=sublime.COOPERATE_WITH_AUTO_COMPLETE,
             css=popups,
             wrapper_class=popups_classname,
-            max_width=min(getSetting('popup_max_width'), width),
-            max_height=min(getSetting('popup_max_height'), height),
+            max_width=min(getSetting('popup_max_width', 0), width),
+            max_height=min(getSetting('popup_max_height', 0), height),
             on_navigate=self.on_navigate,
             on_hide=self.on_hide
         )
@@ -374,11 +369,12 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         output = self.formatPanel(symbolDescription)
         name = 'docphp'
         window = self.view.window()
-        panel = window.get_output_panel(name)
-        window.run_command("show_panel", {"panel": "output." + name})
-        panel.set_read_only(False)
-        panel.insert(edit, panel.size(), output + '\n')
-        panel.set_read_only(True)
+        if window:
+            panel = window.get_output_panel(name)
+            window.run_command("show_panel", {"panel": "output." + name})
+            panel.set_read_only(False)
+            panel.insert(edit, panel.size(), output + '\n' if output else '')
+            panel.set_read_only(True)
 
     def on_hide(self):
         self.currentSymbol = ''
@@ -388,12 +384,11 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         if re.search('^https?://', url):
             webbrowser.open_new(url)
             return True
-
-        m = re.search('^(changeto|constant)\.(.*)', url)
+        symbol = None
+        m = re.search('^(changeto|constant)\\.(.*)', url)
         if m:
             if m.group(1) == 'changeto':
-                symbol, content = getSymbolDescription(
-                    self.currentSymbol, m.group(2))
+                symbol, content = getSymbolDescription(self.currentSymbol, m.group(2))
             else:
                 self.view.run_command('docphp_insert', {"string": m.group(2)})
                 self.view.hide_popup()
@@ -407,32 +402,21 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
             self.currentSymbol = symbol
         if not symbol:
             if getSetting('prompt_when_not_found'):
-                self.view.show_popup(
-                    'Not found', sublime.COOPERATE_WITH_AUTO_COMPLETE)
+                self.view.show_popup('Not found', sublime.COOPERATE_WITH_AUTO_COMPLETE)
                 return
             return
         symbol, content = getSymbolDescription(symbol)
 
-        if content == False:
+        if content is False:
             return False
 
-        content = self.formatPopup(
-            content, symbol=symbol, can_back=len(self.history) > 0)
-
-        content = content[:65535]
+        content = self.formatPopup(content, symbol=symbol, can_back=len(self.history) > 0)
+        content = content[:65535] if content else ''
         popups, popups_classname = self.getCss()
-        mdpopups.update_popup(
-            self.view,
-            content,
-            css=popups,
-            wrapper_class=popups_classname,
-        )
+        mdpopups.update_popup(self.view, content, css=popups, wrapper_class=popups_classname)
 
     def getCss(self):
-        return (
-            sublime.load_resource('Packages/' + package_name + '/style.css'),
-            'docphp_popup'
-        )
+        return (sublime.load_resource('Packages/' + package_name + '/style.css'), 'docphp_popup')
 
     def handle_code_block(self, obj):
         content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
@@ -455,23 +439,19 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
                          '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
         content = re.sub(r'<span class="initializer">\s+=\s+',
                          '<span class="initializer"><span class="operator"> = </span>', content)
-        content = re.sub(r'<div class="phpcode">(.*?)</div>',
-                         self.handle_code_block, content, flags=re.S)
-        content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>',
-                         self.handle_code_block, content, flags=re.S)
-
+        content = re.sub(r'<div class="phpcode">(.*?)</div>', self.handle_code_block, content, flags=re.S)
+        content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>', self.handle_code_block, content, flags=re.S)
         return content
 
     def formatPanel(self, content):
         if not isinstance(content, str):
             return
         content = decodeEntity(content)
-        content = re.sub('\s+', ' ', content)
-        content = re.sub(
-            '<(br\s*/?|/p|/div|/li|(div|p)\s[^<>]*|(div|p))>', '\n', content)
+        content = re.sub(r'\s+', ' ', content)
+        content = re.sub(r'<(br\s*/?|/p|/div|/li|(div|p)\s[^<>]*|(div|p))>', '\n', content)
         content = re.sub('<.*?>', '', content)
-        content = re.sub('\s+\n\s*\n\s+', '\n\n', content)
-        content = re.sub('^\s+', '', content, count=1)
+        content = re.sub(r'\s+\n\s*\n\s+', '\n\n', content)
+        content = re.sub(r'^\s+', '', content, count=1)
         content = decodeEntity(content, 'html')
         return content
 
@@ -605,7 +585,8 @@ class PopupHTMLParser(HTMLParser):
     def get_tag_text(self, tag, attrs, is_startend=False):
         if type(attrs) is list:
             attrs = dict(attrs)
-        return '<' + (tag + ' ' + ' '.join(map(lambda m: m + '="' + re.sub('(?<!\\\\)"', '\\"', attrs[m]) + '"', attrs))).rstrip() + (' />' if is_startend else '>')
+        return '<' + (tag + ' ' + ' '.join(map(lambda m: m + '="' + re.sub(
+            '(?<!\\\\)"', '\\"', attrs[m]) + '"', attrs))).rstrip() + (' />' if is_startend else '>')
 
 
 class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
@@ -632,13 +613,13 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             self.updateLanguage(index)
         else:
             if currentView:
-                currentView.window().show_quick_panel(self.languageList,
-                                                      self.updateLanguage, sublime.KEEP_OPEN_ON_FOCUS_LOST)
+                currentView.window().show_quick_panel(
+                    self.languageList, self.updateLanguage, sublime.KEEP_OPEN_ON_FOCUS_LOST)
 
-    def updateLanguage(self, index=None):
+    def updateLanguage(self, index: int) -> None:
         if index == -1 or index is None:
             return
-        languageName = re.search('^\w+', self.languageList[index]).group(0)
+        languageName = re.search(r'^\w+', self.languageList[index]).group(0)
 
         self.languageName = languageName
         sublime.set_timeout_async(self.checkoutLanguage, 0)
@@ -647,7 +628,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         global language
         languageName = self.languageName
         if not self.downloadLanguageGZ(languageName):
-            if getSetting('debug'):
+            if getSetting('debug', False):
                 print('download error')
             return False
 
@@ -673,8 +654,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         err = None
         try:
             url = 'https://php.net/distributions/manual/php_manual_' + name + '.tar.gz'
-            filename = getDocphpPath() + 'language/php_manual_' + \
-                name + '.tar.gz.downloading'
+            filename = getDocphpPath() + 'language/php_manual_' + name + '.tar.gz.downloading'
 
             response = requests.get(url, stream=True, verify=False)
             try:
@@ -695,8 +675,8 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
 
             # if readsofar:
             if readsofar:
-                isContinue = sublime.ok_cancel_dialog(
-                    'Whether to continue with an uncompleted package, choosing cancel will be downloaded from the beginning', 'continue')
+                isContinue = sublime.ok_cancel_dialog('Whether to continue with an uncompleted package, choosing cancel'
+                                                      'will be downloaded from the beginning', 'continue')
 
             if not isContinue:
                 readsofar = 0
@@ -718,12 +698,10 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
                         if totalsize:
                             # report progress
                             percent = readsofar * 1e2 / totalsize  # assume totalsize > 0
-                            sublime.status_message(
-                                package_name + ': %.0f%% checking out %s' % (percent, name,))
+                            sublime.status_message(package_name + ': %.0f%% checking out %s' % (percent, name,))
                         else:
                             kb = readsofar / 1024
-                            sublime.status_message(
-                                package_name + ': %.0f KB checking out %s' % (kb, name,))
+                            sublime.status_message(package_name + ': %.0f KB checking out %s' % (kb, name,))
                 finally:
                     outputfile.close()
                     self.downloading = False
@@ -734,8 +712,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
         except (requests.exceptions.HTTPError) as e:
             err = '%s: HTTP error %s contacting API' % (__name__, str(e.code))
         except (requests.exceptions.ConnectionError) as e:
-            err = '%s: ConnectionError error %s contacting API' % (
-                __name__, str(e.reason))
+            err = '%s: ConnectionError error %s contacting API' % (__name__, str(e.reason))
         except Exception as e:
             err = e.__class__.__name__
 
@@ -748,8 +725,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             os.rename(filename, newname)
             return True
 
-        sublime.message_dialog('Language ' + name +
-                               ' checkout failed. Please try again.')
+        sublime.message_dialog('Language ' + name + ' checkout failed. Please try again.')
 
         return False
 
@@ -765,8 +741,7 @@ class DocphpSelectLanguageCommand(sublime_plugin.TextCommand):
 
         self.languageList, _ = getLanguageList(getAll=False)
 
-        currentView.window().show_quick_panel(
-            self.languageList, self.selectLanguageCallback)
+        currentView.window().show_quick_panel(self.languageList, self.selectLanguageCallback)
 
     def selectLanguageCallback(self, index):
         global language
@@ -774,8 +749,7 @@ class DocphpSelectLanguageCommand(sublime_plugin.TextCommand):
             language = re.search('^\w+', self.languageList[index]).group(0)
             setSetting('language', language)
             loadLanguage()
-            sublime.message_dialog(
-                'Language ' + language + ' selected successfully')
+            sublime.message_dialog('Language ' + language + ' selected successfully')
 
 
 class DocphpOpenManualIndexCommand(sublime_plugin.TextCommand):
@@ -783,8 +757,7 @@ class DocphpOpenManualIndexCommand(sublime_plugin.TextCommand):
     def run(self, edit):
         global currentView
         currentView = self.view
-        self.view.run_command('docphp_show_definition', {
-                              "symbol": 'index', "force": True})
+        self.view.run_command('docphp_show_definition', {"symbol": 'index', "force": True})
 
 
 class DocphpSearchCommand(sublime_plugin.TextCommand):
@@ -805,14 +778,12 @@ class DocphpSearchCommand(sublime_plugin.TextCommand):
         if at_point:
             symbol = view.substr(view.word(view.sel()[0]))
 
-        files = list(map(lambda file: re.sub('-', '_', file),
-                     docphp_languages[language]["symbolList"].keys()))
+        files = list(map(lambda file: re.sub('-', '_', file), docphp_languages[language]["symbolList"].keys()))
         files.sort()
 
         def show(index):
             if index != -1 and currentView:
-                currentView.run_command('docphp_show_definition', {
-                                        "symbol": files[index], "force": True})
+                currentView.run_command('docphp_show_definition', {"symbol": files[index], "force": True})
 
         selected_index = -1
         if event:
@@ -838,26 +809,24 @@ class DocPHPListener(sublime_plugin.EventListener):
     delaying = False
 
     def on_selection_modified_async(self, view):
-        if not getSetting('auto'):
+        if not getSetting('auto', False):
             return
         global currentView
         currentView = view
         self.prevTime = time.time()
         if not self.delaying:
-            sublime.set_timeout_async(
-                self.doAutoShow, getSetting('auto_delay') + 50)
+            sublime.set_timeout_async(self.doAutoShow, getSetting('auto_delay', 0) + 50)
             self.delaying = True
 
     def doAutoShow(self):
-        delayTime = getSetting('auto_delay')
+        delayTime = getSetting('auto_delay', 500)
         if (time.time() - self.prevTime) * 1000 > delayTime:
             self.delaying = False
             if currentView:
                 if not currentView.is_popup_visible():
                     currentView.run_command('docphp_show_definition')
         else:
-            sublime.set_timeout_async(self.doAutoShow, int(
-                delayTime - (time.time() - self.prevTime) * 1000) + 50)
+            sublime.set_timeout_async(self.doAutoShow, int(delayTime - (time.time() - self.prevTime) * 1000) + 50)
 
 
 class FinishError(Exception):
