@@ -651,84 +651,64 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             'Language {} is checked out'.format(languageName))
 
     def downloadLanguageGZ(self, name):
-        requests.packages.urllib3.disable_warnings()
-        err = None
-        try:
-            url = 'https://php.net/distributions/manual/php_manual_' + name + '.tar.gz'
-            filename = getDocphpPath() + 'language/php_manual_' + name + '.tar.gz.downloading'
-
-            response = requests.get(url, stream=True, verify=False)
-            try:
-                if response.headers['Content-Length']:
-                    # assume correct header
-                    totalsize = int(response.headers['Content-Length'])
-                else:
-                    totalsize = 0
-            except NameError:
-                totalsize = 0
-            except KeyError:
-                totalsize = 0
-
-            readsofar = 0
-            isContinue = False
-            if os.path.exists(filename):
-                readsofar = os.path.getsize(filename)  # 本地已经下载的文件大小
-
-            # if readsofar:
-            if readsofar:
-                isContinue = sublime.ok_cancel_dialog('Whether to continue with an uncompleted package, choosing cancel'
-                                                      'will be downloaded from the beginning', 'continue')
-
+        targzname = getTarGzPath(name)
+        filename = targzname+'.downloading'
+        readsofar = 0
+        if os.path.exists(filename):
+            readsofar = os.path.getsize(filename)  # 本地已经下载的文件大小
+        if readsofar:
+            isContinue = sublime.ok_cancel_dialog('Whether to continue with an uncompleted package, choosing cancel'
+                                                  'will be downloaded from the beginning', 'continue')
             if not isContinue:
                 readsofar = 0
-
-            if readsofar < totalsize:
-                headers = {'Range': 'bytes=%d-' % readsofar}
-                resp = requests.get(
-                    url, stream=True, verify=False, headers=headers)
-                outputfile = open(filename, 'wb' if not isContinue else 'ab')
-                chunksize = 1024
-                try:
-                    self.downloading = name
-                    for data in resp.iter_content(chunk_size=chunksize):
-                        if not data:  # finished downloading
-                            break
-                        readsofar += len(data)
-                        outputfile.write(data)  # save to filename
-                        outputfile.flush()
-                        if totalsize:
-                            # report progress
-                            percent = readsofar * 1e2 / totalsize  # assume totalsize > 0
-                            sublime.status_message(package_name + ': %.0f%% checking out %s' % (percent, name,))
-                        else:
-                            kb = readsofar / 1024
-                            sublime.status_message(package_name + ': %.0f KB checking out %s' % (kb, name,))
-                finally:
-                    outputfile.close()
-                    self.downloading = False
-                    if totalsize and readsofar != totalsize:
-                        # os.unlink(filename)
-                        err = 'Download failed'
-
-        except (requests.exceptions.HTTPError) as e:
-            err = '%s: HTTP error %s contacting API' % (__name__, str(e.code))
-        except (requests.exceptions.ConnectionError) as e:
-            err = '%s: ConnectionError error %s contacting API' % (__name__, str(e.reason))
+        try:
+            self.downloading = name
+            download(name, readsofar, filename)
         except Exception as e:
-            err = e.__class__.__name__
-
-        if not err:
+            sublime.message_dialog('Language ' + name + ' checkout failed. Please try again.')
+            return False
+        else:
+            self.downloading = False
             if os.path.isdir(getI18nCachePath(name)):
                 shutil.rmtree(getI18nCachePath(name))
-            newname = getDocphpPath() + 'language/php_manual_' + name + '.tar.gz'
-            if os.path.isfile(newname):
-                os.remove(newname)
-            os.rename(filename, newname)
+            if os.path.isfile(targzname):
+                os.remove(targzname)
+            os.rename(filename, targzname)
             return True
 
-        sublime.message_dialog('Language ' + name + ' checkout failed. Please try again.')
 
-        return False
+def download(name, readsofar, filename):
+    # sublime.status_message()
+    view = sublime.active_window().active_view()
+    start_indicator(view, '{}: {} checking out {}'.format(package_name, 'downloading', name))
+    url = 'https://php.net/distributions/manual/php_manual_' + name + '.tar.gz'
+    resp = requests.get(url, stream=True, verify=False)
+    totalsize = int(resp.headers['Content-Length'])
+    if totalsize <= readsofar:
+        return
+    if readsofar > 0:
+        resp = requests.get(url, stream=True, verify=False, headers={'Range': 'bytes=%d-' % readsofar})
+    outputfile = open(filename, 'wb' if readsofar == 0 else 'ab')
+    try:
+        chunksize = 1024 * 100
+        for data in resp.iter_content(chunk_size=chunksize):
+            if not data:  # finished downloading
+                break
+            readsofar += len(data)
+            outputfile.write(data)  # save to filename
+            outputfile.flush()
+            if totalsize:
+                # report progress
+                size = "{:.0%}".format(readsofar / totalsize)  # assume totalsize > 0
+            else:
+                size = "{:.0f} KB".format(readsofar / 1024)
+            # sublime.status_message('{}: {} checking out {}'.format(package_name, size, name))
+            start_indicator(view, '{}: {} checking out {}'.format(package_name, size, name))
+    finally:
+        stop_indicator()
+        outputfile.close()
+        if totalsize and readsofar != totalsize:
+            sublime.status_message('Download failed')
 
 
 class DocphpSelectLanguageCommand(sublime_plugin.TextCommand):
