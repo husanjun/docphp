@@ -23,8 +23,8 @@
         "caption": "DocPHP: Settings",
         "command": "edit_settings",
         "args": {
-            "base_file": "${packages}/DocPHPManualer/DocPHPManualer.sublime-settings",
-            "default": "// Settings in here override those in \"DocPHPManualer/DocPHPManualer.sublime-settings\"\n\n{\n\t$0\n}\n",
+            "base_file": "${packages}/ST-PHPManualer/DocPHPManualer.sublime-settings",
+            "default": "// Settings in here override those in \"ST-PHPManualer/DocPHPManualer.sublime-settings\"\n\n{\n\t$0\n}\n",
         },
     },
 ]
