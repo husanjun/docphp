@@ -16,8 +16,8 @@ import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-package_name = 'DocPHPManualer'
-setting_file = package_name + '.sublime-settings'
+package_name = 'ST-PHPManualer'
+setting_file = 'DocPHPManualer.sublime-settings'
 
 docphp_languages = {}
 currentView = None  # type:Optional[sublime.View]
@@ -160,7 +160,6 @@ def getI18nCachePath(languageName=None):
 
 def getTarHandler():
     tarGzPath = getTarGzPath()
-
     try:
         tar = openfiles[tarGzPath]
     except KeyError:
@@ -623,7 +622,7 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
             return
         languageName = re.search(r'^\w+', self.languageList[index]) if self.languageList else ''
         self.languageName = languageName.group(0) if languageName else ''
-        sublime.set_timeout_async(self.checkoutLanguage, 0)
+        sublime.set_timeout_async(self.checkoutLanguage)
 
     def checkoutLanguage(self):
         global language
@@ -678,7 +677,6 @@ class DocphpCheckoutLanguageCommand(sublime_plugin.TextCommand):
 
 
 def download(name, readsofar, filename):
-    # sublime.status_message()
     view = sublime.active_window().active_view()
     start_indicator(view, '{}: {} checking out {}'.format(package_name, 'downloading', name))
     url = 'https://php.net/distributions/manual/php_manual_' + name + '.tar.gz'
@@ -702,7 +700,6 @@ def download(name, readsofar, filename):
                 size = "{:.0%}".format(readsofar / totalsize)  # assume totalsize > 0
             else:
                 size = "{:.0f} KB".format(readsofar / 1024)
-            # sublime.status_message('{}: {} checking out {}'.format(package_name, size, name))
             start_indicator(view, '{}: {} checking out {}'.format(package_name, size, name))
     finally:
         stop_indicator()
