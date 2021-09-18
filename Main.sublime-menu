@@ -17,6 +17,7 @@
                                 "command": "edit_settings",
                                 "args": {
                                     "base_file": "${packages}/ST-PHPManualer/DocPHPManualer.sublime-settings",
+                                    "user_file": "${packages}/User/DocPHPManualer.sublime-settings",
                                     "default": "// Settings in here override those in \"ST-PHPManualer/DocPHPManualer.sublime-settings\"\n{\n\t$0\n}\n"
                                 }
                             },

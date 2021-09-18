@@ -24,7 +24,17 @@
         "command": "edit_settings",
         "args": {
             "base_file": "${packages}/ST-PHPManualer/DocPHPManualer.sublime-settings",
+            "user_file": "${packages}/User/DocPHPManualer.sublime-settings",
             "default": "// Settings in here override those in \"ST-PHPManualer/DocPHPManualer.sublime-settings\"\n\n{\n\t$0\n}\n",
         },
     },
+    {
+        "caption": "DocPHP: Key Bindings",
+        "command": "edit_settings",
+        "args": {
+            "base_file": "${packages}/ST-PHPManualer/Default.sublime-keymap",
+            "user_file": "${packages}/User/Default (${platform}).sublime-keymap",
+            "default": "[\n\t$0\n]\n",
+        }
+    }
 ]
