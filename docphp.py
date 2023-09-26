@@ -13,6 +13,7 @@ import tarfile
 import webbrowser
 import time
 import requests
+import html
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -423,7 +424,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
         content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
         content = content.replace('```php', '')
-        return '\n\n```php{}\n```\n'.format(HTMLParser().unescape(content))
+        return '\n\n```php{}\n```\n'.format(html.unescape(content))
         # print(content)
         # return '\n\n```php\n{}\n```\n'.format(content)
 
