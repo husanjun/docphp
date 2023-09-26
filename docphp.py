@@ -424,7 +424,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
         # return '\n\n```php{}\n```\n'.format(HTMLParser().unescape(content))
         content = content.replace('```php', '')
-        return '\n\n```php{}\n```\n'.format(content)
+        return '\n\n```php\n{}\n```\n'.format(content)
 
     def formatPopup(self, content, symbol, can_back=False):
         if not isinstance(content, str):
