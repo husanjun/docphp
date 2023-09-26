@@ -423,6 +423,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
         content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
         # return '\n\n```php{}\n```\n'.format(HTMLParser().unescape(content))
+        print(content)
         content = content.replace('```php', '')
         return '\n\n```php\n{}\n```\n'.format(content)
 
