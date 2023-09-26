@@ -422,7 +422,9 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
     def handle_code_block(self, obj):
         content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
         content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
-        return '\n\n```php{}\n```\n'.format(HTMLParser().unescape(content))
+        # print(conent)
+        # return '\n\n```php{}\n```\n'.format(HTMLParser().unescape(content))
+        return '\n\n```php{}\n```\n'.format(content)
 
     def formatPopup(self, content, symbol, can_back=False):
         if not isinstance(content, str):
@@ -440,8 +442,8 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
                          '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
         content = re.sub(r'<span class="initializer">\s+=\s+',
                          '<span class="initializer"><span class="operator"> = </span>', content)
-        content = re.sub(r'<div class="phpcode">(.*?)</div>', self.handle_code_block, content, flags=re.S)
-        content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>', self.handle_code_block, content, flags=re.S)
+        # content = re.sub(r'<div class="phpcode">(.*?)</div>', self.handle_code_block, content, flags=re.S)
+        # content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>', self.handle_code_block, content, flags=re.S)
         return content
 
     def formatPanel(self, content):
