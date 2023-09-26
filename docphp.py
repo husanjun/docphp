@@ -13,7 +13,6 @@ import tarfile
 import webbrowser
 import time
 import requests
-import html
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
@@ -423,10 +422,9 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
     def handle_code_block(self, obj):
         content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
         content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
-        content = content.replace('```php', '')
-        return '\n\n```php{}\n```\n'.format(html.unescape(content))
-        # print(content)
-        # return '\n\n```php\n{}\n```\n'.format(content)
+        content = content.replace('&lt;?php', '\n&lt;?php')
+        # return '\n\n```php{}\n```\n'.format(HTMLParser().unescape(content))
+        return '\n\n```php{}\n```\n'.format(content)
 
     def formatPopup(self, content, symbol, can_back=False):
         if not isinstance(content, str):
@@ -446,7 +444,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
                          '<span class="initializer"><span class="operator"> = </span>', content)
         content = re.sub(r'<div class="phpcode">(.*?)</div>', self.handle_code_block, content, flags=re.S)
         content = re.sub(r'<div class="cdata"><pre>(.*?)</pre></div>', self.handle_code_block, content, flags=re.S)
-        return content
+        return HTMLParser().unescape(content)
 
     def formatPanel(self, content):
         if not isinstance(content, str):
