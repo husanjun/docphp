@@ -422,8 +422,9 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
     def handle_code_block(self, obj):
         content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
         content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
-        content = content.replace('&lt;?php', '\n&lt;?php')
-        return '\n\n```php{}\n```\n'.format(HTMLParser().unescape(content))
+        content = content.replace('&lt;?php', '&lt;?php')
+        content = HTMLParser().unescape(content)
+        return '\n\n```php{}{}\n```\n'.format('' if content.startswith('\n') else '\n', content)
 
     def formatPopup(self, content, symbol, can_back=False):
         if not isinstance(content, str):
