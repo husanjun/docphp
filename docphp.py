@@ -2,6 +2,7 @@ from package_control import events
 from typing import Optional
 from sublime_lib import ActivityIndicator
 from html.parser import HTMLParser
+from html import unescape
 from Default import symbol as sublime_symbol
 import mdpopups
 import sublime
@@ -423,7 +424,7 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
         content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
         content = content.replace('&lt;?php', '&lt;?php')
-        content = HTMLParser().unescape(content)
+        content = unescape(content)
         return '\n\n```php{}{}\n```\n'.format('' if content.startswith('\n') else '\n', content)
 
     def formatPopup(self, content, symbol, can_back=False):
