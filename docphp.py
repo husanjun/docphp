@@ -423,9 +423,10 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
     def handle_code_block(self, obj):
         content = re.sub(r'<br\s*?/?>', '\n', obj.group(1))
         content = re.sub(r'</?\w+[^>]*>', '', content, flags=re.S)
-        content = content.replace('&lt;?php', '&lt;?php')
-        content = unescape(content)
-        return '\n\n```php{}{}\n```\n'.format('' if content.startswith('\n') else '\n', content)
+        # content = content.replace('&lt;?php', '&lt;?php')
+        content = content.strip().lstrip('&lt;?php').lstrip('<?php').strip()
+
+        return '\n\n```php{}{}\n```\n'.format('\n<?php\n', content)
 
     def formatPopup(self, content, symbol, can_back=False):
         if not isinstance(content, str):
@@ -439,6 +440,9 @@ class DocphpShowDefinitionCommand(sublime_plugin.TextCommand):
         except FinishError:
             pass
         content = parser.output
+        # content = re.sub(r'<div class="methodsynopsis dc-description">(.*?)</div>',
+        #                  self.handle_code_block, content, flags=re.S)
+        content = content.replace('&$', '&amp;$')
         content = re.sub(r'<strong><code>([0-9A-Z_]+)</code></strong>',
                          '<strong><code><a class="constant" href="constant.\\1">\\1</a></code></strong>', content)
         content = re.sub(r'<span class="initializer">\s+=\s+',
